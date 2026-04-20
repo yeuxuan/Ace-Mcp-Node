@@ -209,11 +209,11 @@ export class Config {
     if (this.maxLinesPerBlob <= 0) {
       throw new Error("MAX_LINES_PER_BLOB must be positive");
     }
-    if (!this.baseUrl) {
-      throw new Error("BASE_URL must be configured");
+    if (!this.baseUrl || this.baseUrl === 'https://api.example.com') {
+      throw new Error('BASE_URL must be configured with a real value in ~/.acemcp/settings.toml');
     }
-    if (!this.token) {
-      throw new Error("TOKEN must be configured");
+    if (!this.token || this.token === 'your-token-here') {
+      throw new Error('TOKEN must be configured with a real value in ~/.acemcp/settings.toml');
     }
   }
 }

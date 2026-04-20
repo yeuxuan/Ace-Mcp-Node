@@ -95,7 +95,7 @@ export function isValidProjectPath(filePath: string): boolean {
   try {
     const normalized = normalizeProjectPath(filePath);
     // 检查是否为绝对路径
-    return path.isAbsolute(normalized) || normalized.startsWith('/');
+    return path.isAbsolute(normalized);
   } catch (error) {
     return false;
   }

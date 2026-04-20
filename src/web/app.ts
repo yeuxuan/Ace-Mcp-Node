@@ -10,7 +10,7 @@ import * as toml from '@iarna/toml';
 import { getConfig } from '../config.js';
 import { logger } from '../logger.js';
 import { getLogBroadcaster } from './logBroadcaster.js';
-import { searchContextTool } from '../tools/searchContext.js';
+import { searchContextTool, resetIndexManager } from '../tools/searchContext.js';
 import { USER_CONFIG_FILE } from '../config.js';
 import { IndexManager } from '../index/manager.js';
 import { fileURLToPath } from 'url';
@@ -47,8 +47,8 @@ export function createApp(): express.Application {
   const logBroadcaster = getLogBroadcaster();
 
   // 中间件
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // 静态文件（如果存在）
   const staticDir = path.join(__dirname, 'static');
@@ -80,7 +80,6 @@ export function createApp(): express.Application {
         max_lines_per_blob: config.maxLinesPerBlob,
         base_url: config.baseUrl,
         token: config.token ? '***' : '',
-        token_full: config.token,
         text_extensions: Array.from(config.textExtensions),
         exclude_patterns: config.excludePatterns,
       });
@@ -109,7 +108,7 @@ export function createApp(): express.Application {
       if (configUpdate.base_url !== undefined) {
         settingsData.BASE_URL = configUpdate.base_url;
       }
-      if (configUpdate.token !== undefined) {
+      if (configUpdate.token !== undefined && configUpdate.token !== '') {
         settingsData.TOKEN = configUpdate.token;
       }
       if (configUpdate.batch_size !== undefined) {
@@ -125,13 +124,16 @@ export function createApp(): express.Application {
         settingsData.EXCLUDE_PATTERNS = configUpdate.exclude_patterns;
       }
 
-      // 保存设置
+      // 保存设置（原子写入：先写临时文件再 rename，防止崩溃损坏配置）
       const newContent = toml.stringify(settingsData as any);
-      fs.writeFileSync(USER_CONFIG_FILE, newContent, 'utf-8');
+      const tmpConfig = `${USER_CONFIG_FILE}.tmp`;
+      fs.writeFileSync(tmpConfig, newContent, 'utf-8');
+      fs.renameSync(tmpConfig, USER_CONFIG_FILE);
 
-      // 重新加载配置
+      // 重新加载配置，并重置 IndexManager 使其下次调用时用新配置重建
       const config = getConfig();
       config.reload();
+      resetIndexManager();
 
       logger.info('Configuration updated and reloaded successfully');
       res.json({ status: 'success', message: 'Configuration updated and applied successfully!' });
@@ -317,8 +319,10 @@ export function createApp(): express.Application {
       // 删除项目
       delete projects[normalizedPath];
       
-      // 保存更新后的 projects.json
-      fs.writeFileSync(projectsFile, JSON.stringify(projects, null, 2), 'utf-8');
+      // 保存更新后的 projects.json（原子写入）
+      const tmpProjects = `${projectsFile}.tmp`;
+      fs.writeFileSync(tmpProjects, JSON.stringify(projects, null, 2), 'utf-8');
+      fs.renameSync(tmpProjects, projectsFile);
       
       logger.info(`Deleted project index: ${normalizedPath}`);
       
@@ -383,9 +387,10 @@ export function createApp(): express.Application {
               
               // 跳过排除的目录
               if (entry.isDirectory()) {
-                const shouldExclude = config.excludePatterns.some(pattern => 
-                  entry.name === pattern || entry.name.match(new RegExp(pattern))
-                );
+                const shouldExclude = config.excludePatterns.some(pattern => {
+                  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*').replace(/\\\?/g, '.');
+                  return entry.name === pattern || new RegExp(`^${escaped}$`).test(entry.name);
+                });
                 
                 if (!shouldExclude && !entry.name.startsWith('.')) {
                   scanDirectory(fullPath);

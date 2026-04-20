@@ -59,6 +59,7 @@ class Logger {
   private logFile: string;
   private fileStream?: fs.WriteStream;
   private broadcastHandlers: Array<(message: string) => void> = [];
+  private writeCount = 0;
   private static instance?: Logger;
 
   constructor(config?: Partial<LoggerConfig>) {
@@ -85,6 +86,13 @@ class Logger {
       Logger.instance = new Logger(config);
     }
     return Logger.instance;
+  }
+
+  /**
+   * 更新现有实例的配置
+   */
+  configure(config: Partial<LoggerConfig>): void {
+    this.config = { ...this.config, ...config };
   }
 
   /**
@@ -215,7 +223,10 @@ class Logger {
     if (level >= this.config.fileLevel && this.fileStream) {
       const logLine = `${this.formatTimestamp(timestamp)} | ${levelName} | ${context || ''} - ${message}\n`;
       this.fileStream.write(logLine);
-      this.checkRotation();
+      this.writeCount++;
+      if (this.writeCount % 100 === 0) {
+        this.checkRotation();
+      }
     }
 
     // 广播到 WebSocket 客户端
@@ -302,7 +313,10 @@ export const logger = Logger.getInstance();
  * 设置日志配置
  */
 export function setupLogging(config?: Partial<LoggerConfig>): Logger {
-  const instance = Logger.getInstance(config);
+  const instance = Logger.getInstance();
+  if (config) {
+    instance.configure(config);
+  }
   instance.info('Logging configured');
   return instance;
 }

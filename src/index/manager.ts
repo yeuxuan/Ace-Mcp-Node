@@ -232,8 +232,8 @@ export class IndexManager {
    * 简单的模式匹配（支持 * 通配符）
    */
   private matchPattern(str: string, pattern: string): boolean {
-    const regexPattern = pattern.replace(/\*/g, '.*').replace(/\?/g, '.');
-    const regex = new RegExp(`^${regexPattern}$`);
+    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*').replace(/\\\?/g, '.');
+    const regex = new RegExp(`^${escaped}$`);
     return regex.test(str);
   }
 
@@ -257,11 +257,14 @@ export class IndexManager {
    * 保存项目数据
    */
   private saveProjects(projects: Record<string, string[]>): void {
+    const tmpFile = `${this.projectsFile}.tmp`;
     try {
       const content = JSON.stringify(projects, null, 2);
-      fs.writeFileSync(this.projectsFile, content, 'utf-8');
+      fs.writeFileSync(tmpFile, content, 'utf-8');
+      fs.renameSync(tmpFile, this.projectsFile);
     } catch (error) {
       logger.error(`Failed to save projects data: ${error}`);
+      try { fs.unlinkSync(tmpFile); } catch {}
       throw error;
     }
   }
@@ -518,7 +521,7 @@ export class IndexManager {
             const uploadBatch = async () => {
               const response = await this.httpClient.post(`${this.baseUrl}/batch-upload`, {
                 blobs: batchBlobs,
-              });
+              }, { timeout: 120000 });
               return response.data;
             };
 
@@ -673,8 +676,9 @@ export class IndexManager {
       try {
         result = await this.retryRequest(searchRequest, 3, 2000);
       } catch (error: any) {
-        logger.error(`Search request failed after retries: ${error.message}`);
-        return `Error: Search request failed after 3 retries. ${error.message}`;
+        const detail = error.response?.data ? ` Server response: ${JSON.stringify(error.response.data)}` : '';
+        logger.error(`Search request failed after retries: ${error.message}${detail}`);
+        return `Error: Search request failed after 3 retries. ${error.message}${detail}`;
       }
 
       const formattedRetrieval = result.formatted_retrieval || '';

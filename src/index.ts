@@ -11,11 +11,14 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+import { createRequire } from 'module';
 import { initConfig, getConfig } from './config.js';
 import { setupLogging, logger } from './logger.js';
 import { searchContextTool } from './tools/searchContext.js';
 import { createApp } from './web/app.js';
+
+const require = createRequire(import.meta.url);
+const { version: pkgVersion } = require('../package.json');
 
 /**
  * 解析命令行参数
@@ -33,7 +36,11 @@ function parseArgs(): { baseUrl?: string; token?: string; webPort?: number } {
       result.token = args[i + 1];
       i++;
     } else if (arg === '--web-port' && i + 1 < args.length) {
-      result.webPort = parseInt(args[i + 1], 10);
+      const port = parseInt(args[i + 1], 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        throw new Error(`Invalid --web-port value: "${args[i + 1]}". Must be a number between 1 and 65535.`);
+      }
+      result.webPort = port;
       i++;
     }
   }
@@ -47,7 +54,7 @@ function parseArgs(): { baseUrl?: string; token?: string; webPort?: number } {
 const server = new Server(
   {
     name: 'acemcp',
-    version: '0.1.4',
+    version: pkgVersion,
   },
   {
     capabilities: {
@@ -64,19 +71,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     {
       name: 'search_context',
       description:
-        'Search for relevant code context based on a query within a specific project. This tool automatically performs incremental indexing before searching, ensuring results are always up-to-date. Returns formatted text snippets from the codebase that are semantically related to your query. Supports cross-platform paths including Windows WSL.',
+        'Semantically search a codebase to retrieve relevant code context. Use this tool whenever you need to understand, navigate, or reason about a codebase before making changes — it understands meaning, not just text, so queries like "how does authentication work" or "where are database connections managed" return the right code even without exact keyword matches. Automatically performs incremental indexing before each search so results always reflect the current state of the project. Returns formatted snippets with file paths and line numbers, ready to use in follow-up reasoning or edits. Supports Windows, Linux, macOS, and WSL paths.',
       inputSchema: {
         type: 'object',
         properties: {
           project_root_path: {
             type: 'string',
             description:
-              'Absolute path to the project root directory. Supports cross-platform paths: Windows (C:/Users/...), WSL UNC (\\\\wsl$\\Ubuntu\\home\\...), Unix (/home/...), WSL-to-Windows (/mnt/c/...). Paths are automatically normalized.',
+              'Absolute path to the project root directory. All common path formats are accepted and automatically normalized: Windows (C:/Users/...), WSL UNC (\\\\wsl$\\Ubuntu\\home\\...), Unix/macOS (/home/... or /Users/...), WSL-to-Windows (/mnt/c/...).',
           },
           query: {
             type: 'string',
             description:
-              "Natural language search query to find relevant code context. This tool performs semantic search and returns code snippets that match your query. Examples: 'logging configuration setup initialization logger' (finds logging setup code), 'user authentication login' (finds auth-related code), 'database connection pool' (finds DB connection code), 'error handling exception' (finds error handling patterns), 'API endpoint routes' (finds API route definitions). The tool returns formatted text snippets with file paths and line numbers showing where the relevant code is located.",
+              'Natural language description of the code you are looking for. Phrase it as a question or a concept rather than keywords — the engine understands intent. Good examples: "how is user authentication implemented", "database connection pool setup", "error handling and retry logic for API calls", "React components that manage form state", "where are environment variables loaded", "entry point and startup sequence". The tool returns formatted code snippets with file paths and line numbers.',
           },
         },
         required: ['project_root_path', 'query'],

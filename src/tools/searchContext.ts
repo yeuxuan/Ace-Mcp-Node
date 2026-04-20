@@ -7,6 +7,28 @@ import { IndexManager } from '../index/manager.js';
 import { logger } from '../logger.js';
 import { normalizeProjectPath } from '../utils/pathUtils.js';
 
+let _indexManager: IndexManager | undefined;
+
+function getIndexManager(): IndexManager {
+  if (!_indexManager) {
+    const config = getConfig();
+    _indexManager = new IndexManager(
+      config.indexStoragePath,
+      config.baseUrl,
+      config.token,
+      config.textExtensions,
+      config.batchSize,
+      config.maxLinesPerBlob,
+      config.excludePatterns
+    );
+  }
+  return _indexManager;
+}
+
+export function resetIndexManager(): void {
+  _indexManager = undefined;
+}
+
 /**
  * 工具参数接口
  */
@@ -49,17 +71,7 @@ export async function searchContextTool(arguments_: SearchContextArgs): Promise<
 
     logger.info(`Tool invoked: search_context for project ${normalizedPath} with query: ${query}`);
 
-    const config = getConfig();
-    const indexManager = new IndexManager(
-      config.indexStoragePath,
-      config.baseUrl,
-      config.token,
-      config.textExtensions,
-      config.batchSize,
-      config.maxLinesPerBlob,
-      config.excludePatterns
-    );
-
+    const indexManager = getIndexManager();
     const result = await indexManager.searchContext(normalizedPath, query);
 
     return { type: 'text', text: result };

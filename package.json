@@ -1,6 +1,6 @@
 {
   "name": "acemcp-node",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "description": "MCP server for codebase indexing and semantic search - Node.js implementation",
   "main": "dist/index.js",
   "type": "module",

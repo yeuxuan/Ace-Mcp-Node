@@ -391,11 +391,11 @@
                 disconnected: 'Disconnected',
                 tool_debugger: 'Tool Debugger',
                 select_tool: 'Select Tool',
-                tool_search_context: 'Search Context (Auto-indexes before search)',
+                tool_search_context: 'search_context — Semantic codebase search (auto-indexes)',
                 project_root_path: 'Project Root Path',
                 project_root_path_hint: 'Use forward slashes (/) as path separators',
                 query: 'Query',
-                query_hint: 'Use descriptive keywords for semantic search. Example: "查找所有调用 get_model 的地方"',
+                query_hint: 'Phrase as a natural language question or concept, e.g. "how is authentication implemented" or "where are database connections managed"',
                 execute_tool: 'Execute Tool',
                 executing: 'Executing...',
                 tool_result: 'Tool Result',
@@ -459,11 +459,11 @@
                 disconnected: '已断开',
                 tool_debugger: '工具调试器',
                 select_tool: '选择工具',
-                tool_search_context: '搜索上下文（搜索前自动索引）',
+                tool_search_context: 'search_context — 语义代码搜索（自动增量索引）',
                 project_root_path: '项目根路径',
                 project_root_path_hint: '使用正斜杠 (/) 作为路径分隔符',
                 query: '查询',
-                query_hint: '使用描述性关键词进行语义搜索。示例："查找所有调用 get_model 的地方"',
+                query_hint: '用自然语言描述你要找的内容，例如："用户认证是怎么实现的" 或 "数据库连接在哪里管理"',
                 execute_tool: '执行工具',
                 executing: '执行中...',
                 tool_result: '工具结果',
@@ -624,7 +624,7 @@
                         this.config = await response.json();
                         this.editConfig = {
                             base_url: this.config.base_url,
-                            token: this.config.token_full || '',
+                            token: '',
                             batch_size: this.config.batch_size,
                             max_lines_per_blob: this.config.max_lines_per_blob,
                             text_extensions_str: this.config.text_extensions?.join(', ') || '',
@@ -934,9 +934,6 @@
                 },
 
                 updateToolForm() {
-                    if (this.selectedTool === 'index_code') {
-                        this.toolArgs.query = '';
-                    }
                 },
 
                 async checkProjectStatus() {
